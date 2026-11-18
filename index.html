@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CasheaControl — Gestión Integral de Ventas Cashea</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+    .cashea-yellow {
+      background-color: #FFDC00;
+      color: #0F172A;
+    }
+    .cashea-yellow:hover {
+      background-color: #f5d000;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl cashea-yellow flex items-center justify-center font-extrabold text-xl shadow-sm">
+          C
+        </div>
+        <div>
+          <h1 class="font-bold text-lg tracking-tight leading-tight flex items-center gap-2">
+            CasheaControl
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-yellow-400 border border-yellow-400/30">PRO</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Control total de ventas, iniciales y cuotas (14 días)</p>
+        </div>
+      </div>
+
+      <!-- BCV Rate & Global Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="hidden md:flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 gap-2">
+          <span class="text-xs text-slate-400 font-medium">Tasa BCV:</span>
+          <input
+            type="number"
+            id="bcvRateInput"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            class="w-20 bg-slate-900 text-yellow-400 font-bold text-sm px-2 py-0.5 rounded border border-slate-700 focus:outline-none focus:border-yellow-400 text-right"
+            title="Ingresa la tasa BCV del día para ver equivalentes en Bs."
+          />
+          <span class="text-xs text-slate-400">Bs/$</span>
+        </div>
+
+        <button
+          onclick="exportToCSV()"
+          type="button"
+          class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+          title="Exportar reporte completo a Excel (CSV)"
+        >
+          <i class="fa-solid fa-file-excel text-emerald-400"></i>
+          <span class="hidden sm:inline">Excel</span>
+        </button>
+
+        <button
+          onclick="exportBackupJSON()"
+          type="button"
+          class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+          title="Descargar respaldo de seguridad (JSON)"
+        >
+          <i class="fa-solid fa-download text-sky-400"></i>
+          <span class="hidden lg:inline">Respaldar</span>
+        </button>
+
+        <label
+          class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+          title="Restaurar respaldo desde archivo JSON"
+        >
+          <i class="fa-solid fa-upload text-amber-400"></i>
+          <span class="hidden lg:inline">Restaurar</span>
+          <input type="file" id="restoreJsonInput" accept=".json" class="hidden" onchange="importBackupJSON(event)" />
+        </label>
+
+        <button
+          onclick="openNewSaleModal()"
+          type="button"
+          class="cashea-yellow font-bold text-xs sm:text-sm px-4 py-2 rounded-lg shadow flex items-center gap-2 transition cursor-pointer"
+        >
+          <i class="fa-solid fa-plus"></i>
+          <span>Nueva Venta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Mobile BCV Input -->
+    <div class="flex md:hidden items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+      <span class="text-xs font-semibold text-slate-600">Tasa BCV Referencial (Bs/$):</span>
+      <input
+        type="number"
+        id="bcvRateInputMobile"
+        step="0.01"
+        min="0"
+        placeholder="0.00"
+        class="w-28 bg-slate-50 text-slate-900 font-bold text-sm px-2.5 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-slate-900 text-right"
+      />
+    </div>
+
+    <!-- KPI Cards Grid -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Vendido</span>
+          <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+            <i class="fa-solid fa-bag-shopping text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div id="kpiTotalSold" class="text-2xl font-extrabold text-slate-900">$0.00</div>
+          <div id="kpiTotalSoldBs" class="text-xs text-slate-400 mt-0.5">0 ventas registradas</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Iniciales Cobradas</span>
+          <div class="w-8 h-8 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center">
+            <i class="fa-solid fa-hand-holding-dollar text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div id="kpiDownPayments" class="text-2xl font-extrabold text-slate-900">$0.00</div>
+          <div id="kpiDownPaymentsPct" class="text-xs text-slate-500 mt-0.5">0% del volumen total</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Financiado</span>
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <i class="fa-solid fa-calendar-days text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div id="kpiFinanced" class="text-2xl font-extrabold text-indigo-600">$0.00</div>
+          <div id="kpiFinancedCount" class="text-xs text-slate-500 mt-0.5">En cuotas cada 14 días</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Por Cobrar (Cuotas)</span>
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <i class="fa-solid fa-clock text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div id="kpiPending" class="text-2xl font-extrabold text-amber-600">$0.00</div>
+          <div id="kpiOverdueNote" class="text-xs text-slate-500 mt-0.5">0 cuotas pendientes</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Cobrado Real</span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <i class="fa-solid fa-circle-check text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div id="kpiCollected" class="text-2xl font-extrabold text-emerald-600">$0.00</div>
+          <div id="kpiCollectedBs" class="text-xs text-slate-400 mt-0.5">Inicial + Cuotas pagadas</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters & Search Toolbar -->
+    <section class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-1.5" id="filterTabs">
+        <button onclick="setFilter('ALL')" data-filter="ALL" class="filter-btn active px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white transition cursor-pointer">
+          Todas <span id="countAll" class="ml-1 opacity-75">(0)</span>
+        </button>
+        <button onclick="setFilter('ACTIVE')" data-filter="ACTIVE" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+          En Curso <span id="countActive" class="ml-1 opacity-75">(0)</span>
+        </button>
+        <button onclick="setFilter('DUE_SOON')" data-filter="DUE_SOON" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+          Próximas (≤3d) <span id="countDueSoon" class="ml-1 opacity-75">(0)</span>
+        </button>
+        <button onclick="setFilter('OVERDUE')" data-filter="OVERDUE" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+          Vencidas <span id="countOverdue" class="ml-1 opacity-75">(0)</span>
+        </button>
+        <button onclick="setFilter('COMPLETED')" data-filter="COMPLETED" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+          Liquidadas <span id="countCompleted" class="ml-1 opacity-75">(0)</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1 md:w-72">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input
+            type="text"
+            id="searchInput"
+            oninput="renderSalesTable()"
+            placeholder="Buscar cliente, vendedor, factura..."
+            class="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 focus:bg-white transition"
+          />
+        </div>
+        <button
+          onclick="loadDemoData()"
+          type="button"
+          class="text-xs font-medium text-slate-500 hover:text-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition whitespace-nowrap cursor-pointer"
+          title="Cargar ejemplos de prueba"
+        >
+          Datos Demo
+        </button>
+      </div>
+    </section>
+
+    <!-- Sales Table -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <th class="py-3.5 px-4">Fecha / Ref.</th>
+              <th class="py-3.5 px-4">Cliente</th>
+              <th class="py-3.5 px-4">Vendedor</th>
+              <th class="py-3.5 px-4 text-right">Total Venta</th>
+              <th class="py-3.5 px-4 text-right">Inicial</th>
+              <th class="py-3.5 px-4 text-right">Financiado</th>
+              <th class="py-3.5 px-4 text-center">Progreso Cuotas</th>
+              <th class="py-3.5 px-4">Próximo Vencimiento</th>
+              <th class="py-3.5 px-4 text-center">Estado</th>
+              <th class="py-3.5 px-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="salesTableBody" class="divide-y divide-slate-100 text-sm">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" class="hidden py-14 px-4 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+          <i class="fa-solid fa-receipt"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-800">No hay ventas para mostrar</h3>
+        <p class="text-sm text-slate-500 max-w-md mx-auto mt-1">
+          Registra tu primera venta con Cashea haciendo clic en <strong>"Nueva Venta"</strong> o carga datos de demostración para explorar el sistema.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: Nueva Venta Cashea -->
+  <div id="newSaleModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 my-8">
+      <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="w-7 h-7 rounded-lg cashea-yellow flex items-center justify-center font-extrabold text-sm">C</span>
+          <h2 class="font-bold text-base">Registrar Venta por Cashea</h2>
+        </div>
+        <button onclick="closeNewSaleModal()" type="button" class="text-slate-400 hover:text-white transition cursor-pointer">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="newSaleForm" onsubmit="handleCreateSale(event)" class="p-6 space-y-4">
+        <!-- Fila 1: Fecha, Factura y Vendedor -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Fecha de la Venta *</label>
+            <input type="date" id="saleDate" required onchange="updateSalePreview()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">N° Factura / Orden *</label>
+            <input type="text" id="saleInvoice" required placeholder="Ej. FAC-00145" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre del Vendedor *</label>
+            <input
+              type="text"
+              id="saleSeller"
+              list="sellersDatalist"
+              required
+              placeholder="Ej. Luz Pineda"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
+            />
+            <datalist id="sellersDatalist"></datalist>
+          </div>
+        </div>
+
+        <!-- Fila 2: Cliente y Documento -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre del Cliente *</label>
+            <input type="text" id="saleClient" required placeholder="Ej. María Fernanda Pérez" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Cédula / Teléfono</label>
+            <input type="text" id="saleClientDoc" placeholder="Ej. V-24.123.456 / 0414-0000000" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+        </div>
+
+        <!-- Fila 3: Montos -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Monto Total ($) *</label>
+            <input type="number" id="saleTotal" step="0.01" min="1" required placeholder="0.00" oninput="onTotalOrPctChange()" class="w-full px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Inicial Cashea (%)</label>
+            <select id="saleDownPct" onchange="onTotalOrPctChange()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 bg-white">
+              <option value="60">60% (Nivel 1)</option>
+              <option value="50">50% (Nivel 2)</option>
+              <option value="40" selected>40% (Nivel 3 / Estándar)</option>
+              <option value="30">30% (Nivel 4)</option>
+              <option value="20">20% (Nivel 5 / Más cuotas)</option>
+              <option value="custom">Monto Manual ($)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Monto Inicial ($) *</label>
+            <input type="number" id="saleDownAmount" step="0.01" min="0" required placeholder="0.00" oninput="onManualDownChange()" class="w-full px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+        </div>
+
+        <!-- Fila 4: Cuotas y Método Inicial -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Plan de Cuotas (Cada 14 días) *</label>
+            <select id="saleInstallmentsCount" onchange="updateSalePreview()" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 bg-white">
+              <option value="3" selected>3 Cuotas sin interés</option>
+              <option value="6">6 Cuotas (Modo Más Cuotas)</option>
+              <option value="9">9 Cuotas (Modo Más Cuotas)</option>
+              <option value="12">12 Cuotas (Modo Más Cuotas)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Método Pago Inicial (Tienda)</label>
+            <select id="saleDownMethod" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 bg-white">
+              <option value="Pago Móvil">Pago Móvil</option>
+              <option value="Punto de Venta (Débito/Crédito)">Punto de Venta (Débito/Crédito)</option>
+              <option value="Efectivo Divisas ($)">Efectivo Divisas ($)</option>
+              <option value="Efectivo Bolívares (Bs)">Efectivo Bolívares (Bs)</option>
+              <option value="Zelle / Transferencia">Zelle / Transferencia</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Descripción / Artículos Vendidos</label>
+          <input type="text" id="saleNotes" placeholder="Ej. 2 Conjuntos deportivos + 1 Franela" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900" />
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">
+            <span>Resumen Automático de Financiamiento</span>
+            <span id="previewFinancedBadge" class="text-indigo-600 font-bold">Financiado: $0.00</span>
+          </div>
+          <div id="previewInstallmentsList" class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+            <!-- Preview items -->
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeNewSaleModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer">
+            Cancelar
+          </button>
+          <button type="submit" class="cashea-yellow px-5 py-2 text-sm font-bold rounded-lg shadow transition cursor-pointer">
+            Guardar Venta
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Detalle y Control de Cuotas -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 my-8">
+      <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span id="detailInvoice" class="text-xs font-bold px-2 py-0.5 rounded bg-yellow-400 text-slate-900">FAC-000</span>
+            <h2 id="detailClientName" class="font-bold text-base">Cliente</h2>
+            <span id="detailSellerBadge" class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700">
+              <i class="fa-solid fa-user-tie text-yellow-400 mr-1"></i>Vendedor
+            </span>
+          </div>
+          <p id="detailSubInfo" class="text-xs text-slate-400 mt-1">Fecha • Cédula</p>
+        </div>
+        <button onclick="closeDetailModal()" type="button" class="text-slate-400 hover:text-white transition cursor-pointer">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <div>
+            <span class="text-[11px] font-semibold text-slate-400 uppercase block">Total Venta</span>
+            <span id="detailTotal" class="text-base font-extrabold text-slate-900">$0.00</span>
+          </div>
+          <div>
+            <span class="text-[11px] font-semibold text-slate-400 uppercase block">Inicial Pagada</span>
+            <span id="detailDown" class="text-base font-extrabold text-emerald-600">$0.00</span>
+          </div>
+          <div>
+            <span class="text-[11px] font-semibold text-slate-400 uppercase block">Cuotas Pagadas</span>
+            <span id="detailPaidInstallments" class="text-base font-extrabold text-indigo-600">$0.00</span>
+          </div>
+          <div>
+            <span class="text-[11px] font-semibold text-slate-400 uppercase block">Saldo Pendiente</span>
+            <span id="detailBalance" class="text-base font-extrabold text-amber-600">$0.00</span>
+          </div>
+        </div>
+
+        <div id="detailMetaBox" class="text-xs text-slate-600 bg-yellow-50/60 border border-yellow-200/80 rounded-lg px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <span id="detailNotesText">Sin descripción adicional</span>
+          <span id="detailDownMethodText" class="font-semibold text-slate-700">Inicial vía: Pago Móvil</span>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">Cronograma de Cuotas (Cada 14 días)</h3>
+          <div id="detailInstallmentsContainer" class="space-y-2.5">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+          <button id="deleteSaleBtn" type="button" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-trash-can"></i> Eliminar Venta
+          </button>
+          <button onclick="closeDetailModal()" type="button" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-5 py-2 rounded-lg transition cursor-pointer">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Registrar Pago de Cuota -->
+  <div id="payInstallmentModal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+      <div class="bg-emerald-600 text-white px-5 py-3.5 flex items-center justify-between">
+        <h3 class="font-bold text-sm flex items-center gap-2">
+          <i class="fa-solid fa-circle-check"></i>
+          Registrar Cobro de Cuota #<span id="payInstNumber">1</span>
+        </h3>
+        <button onclick="closePayInstallmentModal()" type="button" class="text-emerald-100 hover:text-white cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form onsubmit="confirmPayInstallment(event)" class="p-5 space-y-4">
+        <input type="hidden" id="paySaleId" />
+        <input type="hidden" id="payInstIndex" />
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500">Monto de la Cuota:</span>
+          <span id="payInstAmountDisplay" class="text-lg font-extrabold text-slate-900">$0.00</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Fecha de Cobro / Liquidación *</label>
+          <input type="date" id="payInstDate" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Método de Recepción</label>
+          <select id="payInstMethod" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600 bg-white">
+            <option value="Liquidación Cashea (Banco)">Liquidación Cashea (Banco)</option>
+            <option value="Pago Móvil">Pago Móvil</option>
+            <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+            <option value="Zelle / Divisas">Zelle / Divisas</option>
+            <option value="Efectivo">Efectivo</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Referencia / Lote (Opcional)</label>
+          <input type="text" id="payInstRef" placeholder="Ej. Ref. 0049281 o Lote Cashea #12" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-600" />
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closePayInstallmentModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">
+            Cancelar
+          </button>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold rounded-lg shadow transition cursor-pointer">
+            Confirmar Cobro
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'cashea_control_sales_v1';
+    const BCV_STORAGE_KEY = 'cashea_control_bcv_v1';
+
+    let sales = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let currentFilter = 'ALL';
+    let bcvRate = parseFloat(localStorage.getItem(BCV_STORAGE_KEY)) || 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const bcvDesktop = document.getElementById('bcvRateInput');
+      const bcvMobile = document.getElementById('bcvRateInputMobile');
+
+      if (bcvRate > 0) {
+        if (bcvDesktop) bcvDesktop.value = bcvRate;
+        if (bcvMobile) bcvMobile.value = bcvRate;
+      }
+
+      const syncBcv = (val) => {
+        bcvRate = parseFloat(val) || 0;
+        localStorage.setItem(BCV_STORAGE_KEY, bcvRate);
+        if (bcvDesktop) bcvDesktop.value = val;
+        if (bcvMobile) bcvMobile.value = val;
+        updateDashboard();
+        renderSalesTable();
+      };
+
+      if (bcvDesktop) bcvDesktop.addEventListener('input', (e) => syncBcv(e.target.value));
+      if (bcvMobile) bcvMobile.addEventListener('input', (e) => syncBcv(e.target.value));
+
+      updateSellersDatalist();
+      updateDashboard();
+      renderSalesTable();
+    });
+
+    function saveSales() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sales));
+      updateSellersDatalist();
+      updateDashboard();
+      renderSalesTable();
+    }
+
+    function updateSellersDatalist() {
+      const datalist = document.getElementById('sellersDatalist');
+      if (!datalist) return;
+      const uniqueSellers = [...new Set(
+        sales
+          .map(s => (s.sellerName || '').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b));
+
+      datalist.innerHTML = uniqueSellers
+        .map(seller => `<option value="${escapeHtml(seller)}"></option>`)
+        .join('');
+    }
+
+    function getTodayISO() {
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000;
+      return new Date(now - offset).toISOString().split('T')[0];
+    }
+
+    function addDaysISO(dateISO, days) {
+      const [y, m, d] = dateISO.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setDate(dt.getDate() + days);
+      const yy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    }
+
+    function formatDateShort(dateISO) {
+      if (!dateISO) return '—';
+      const [y, m, d] = dateISO.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    function diffDaysFromToday(targetISO) {
+      const todayStr = getTodayISO();
+      const [ty, tm, td] = todayStr.split('-').map(Number);
+      const [y, m, d] = targetISO.split('-').map(Number);
+      const today = new Date(ty, tm - 1, td);
+      const target = new Date(y, m - 1, d);
+      return Math.round((target - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function formatUSD(amount) {
+      return '$' + Number(amount || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function formatBs(usdAmount) {
+      if (!bcvRate || bcvRate <= 0) return '';
+      const bs = usdAmount * bcvRate;
+      return 'Bs. ' + bs.toLocaleString('es-VE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function buildInstallments(saleDate, financedAmount, count) {
+      const list = [];
+      if (financedAmount <= 0 || count <= 0) return list;
+
+      const baseAmount = Math.floor((financedAmount / count) * 100) / 100;
+      let remainder = Math.round((financedAmount - baseAmount * count) * 100) / 100;
+
+      for (let i = 1; i <= count; i++) {
+        let amt = baseAmount;
+        if (i === count) {
+          amt = Math.round((amt + remainder) * 100) / 100;
+        }
+        list.push({
+          number: i,
+          dueDate: addDaysISO(saleDate, i * 14),
+          amount: amt,
+          paid: false,
+          paidDate: null,
+          paidMethod: '',
+          reference: ''
+        });
+      }
+      return list;
+    }
+
+    function getSaleStatus(sale) {
+      const unpaid = sale.installments.filter(i => !i.paid);
+      if (unpaid.length === 0) {
+        return { code: 'COMPLETED', label: 'Liquidada', badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200', nextDue: null };
+      }
+
+      unpaid.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      const next = unpaid[0];
+      const daysDiff = diffDaysFromToday(next.dueDate);
+
+      if (daysDiff < 0) {
+        return {
+          code: 'OVERDUE',
+          label: `Vencida (${Math.abs(daysDiff)}d)`,
+          badgeClass: 'bg-rose-100 text-rose-700 border-rose-200',
+          nextDue: next,
+          daysDiff
+        };
+      }
+      if (daysDiff <= 3) {
+        return {
+          code: 'DUE_SOON',
+          label: daysDiff === 0 ? 'Vence Hoy' : `En ${daysDiff}d`,
+          badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+          nextDue: next,
+          daysDiff
+        };
+      }
+      return {
+        code: 'ACTIVE',
+        label: 'Al Día',
+        badgeClass: 'bg-sky-100 text-sky-700 border-sky-200',
+        nextDue: next,
+        daysDiff
+      };
+    }
+
+    function updateDashboard() {
+      let totalSold = 0;
+      let totalDown = 0;
+      let totalFinanced = 0;
+      let totalPaidInstallments = 0;
+      let totalPending = 0;
+      let pendingInstallmentsCount = 0;
+      let overdueInstallmentsCount = 0;
+
+      let countAll = sales.length;
+      let countActive = 0;
+      let countDueSoon = 0;
+      let countOverdue = 0;
+      let countCompleted = 0;
+
+      sales.forEach(sale => {
+        totalSold += sale.totalAmount;
+        totalDown += sale.downPayment;
+        totalFinanced += sale.financedAmount;
+
+        sale.installments.forEach(inst => {
+          if (inst.paid) {
+            totalPaidInstallments += inst.amount;
+          } else {
+            totalPending += inst.amount;
+            pendingInstallmentsCount++;
+            if (diffDaysFromToday(inst.dueDate) < 0) {
+              overdueInstallmentsCount++;
+            }
+          }
+        });
+
+        const st = getSaleStatus(sale);
+        if (st.code === 'COMPLETED') countCompleted++;
+        else {
+          countActive++;
+          if (st.code === 'DUE_SOON') countDueSoon++;
+          if (st.code === 'OVERDUE') countOverdue++;
+        }
+      });
+
+      const totalCollected = totalDown + totalPaidInstallments;
+      const downPct = totalSold > 0 ? ((totalDown / totalSold) * 100).toFixed(1) : 0;
+
+      document.getElementById('kpiTotalSold').textContent = formatUSD(totalSold);
+      document.getElementById('kpiTotalSoldBs').textContent = bcvRate > 0
+        ? `${formatBs(totalSold)} • ${countAll} ventas`
+        : `${countAll} ventas registradas`;
+
+      document.getElementById('kpiDownPayments').textContent = formatUSD(totalDown);
+      document.getElementById('kpiDownPaymentsPct').textContent = `${downPct}% del volumen vendido`;
+
+      document.getElementById('kpiFinanced').textContent = formatUSD(totalFinanced);
+      document.getElementById('kpiFinancedCount').textContent = bcvRate > 0
+        ? formatBs(totalFinanced)
+        : 'Distribuido cada 14 días';
+
+      document.getElementById('kpiPending').textContent = formatUSD(totalPending);
+      document.getElementById('kpiOverdueNote').innerHTML = overdueInstallmentsCount > 0
+        ? `<span class="text-rose-600 font-semibold">${overdueInstallmentsCount} vencidas</span> de ${pendingInstallmentsCount} pend.`
+        : `${pendingInstallmentsCount} cuotas pendientes`;
+
+      document.getElementById('kpiCollected').textContent = formatUSD(totalCollected);
+      document.getElementById('kpiCollectedBs').textContent = bcvRate > 0
+        ? formatBs(totalCollected)
+        : 'Iniciales + cuotas cobradas';
+
+      document.getElementById('countAll').textContent = `(${countAll})`;
+      document.getElementById('countActive').textContent = `(${countActive})`;
+      document.getElementById('countDueSoon').textContent = `(${countDueSoon})`;
+      document.getElementById('countOverdue').textContent = `(${countOverdue})`;
+      document.getElementById('countCompleted').textContent = `(${countCompleted})`;
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.dataset.filter === filter) {
+          btn.className = 'filter-btn active px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white transition cursor-pointer';
+        } else {
+          btn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer';
+        }
+      });
+      renderSalesTable();
+    }
+
+    function renderSalesTable() {
+      const tbody = document.getElementById('salesTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const searchInput = document.getElementById('searchInput');
+      const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+      const filtered = sales.filter(sale => {
+        const st = getSaleStatus(sale);
+
+        if (currentFilter === 'COMPLETED' && st.code !== 'COMPLETED') return false;
+        if (currentFilter === 'ACTIVE' && st.code === 'COMPLETED') return false;
+        if (currentFilter === 'DUE_SOON' && st.code !== 'DUE_SOON') return false;
+        if (currentFilter === 'OVERDUE' && st.code !== 'OVERDUE') return false;
+
+        if (query) {
+          const matchClient = sale.clientName.toLowerCase().includes(query);
+          const matchDoc = (sale.clientDoc || '').toLowerCase().includes(query);
+          const matchInv = sale.invoice.toLowerCase().includes(query);
+          const matchSeller = (sale.sellerName || '').toLowerCase().includes(query);
+          const matchNotes = (sale.notes || '').toLowerCase().includes(query);
+          return matchClient || matchDoc || matchInv || matchSeller || matchNotes;
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => b.saleDate.localeCompare(a.saleDate));
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      tbody.innerHTML = filtered.map(sale => {
+        const st = getSaleStatus(sale);
+        const totalInst = sale.installments.length;
+        const paidInst = sale.installments.filter(i => i.paid).length;
+        const pct = totalInst > 0 ? Math.round((paidInst / totalInst) * 100) : 100;
+        const downPct = sale.totalAmount > 0 ? Math.round((sale.downPayment / sale.totalAmount) * 100) : 0;
+
+        const nextDueHtml = st.nextDue
+          ? `<div class="font-semibold text-slate-800">${formatDateShort(st.nextDue.dueDate)}</div>
+             <div class="text-xs text-slate-500">Cuota #${st.nextDue.number}: <strong class="text-slate-700">${formatUSD(st.nextDue.amount)}</strong></div>`
+          : `<span class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-check-double mr-1"></i>Completado</span>`;
+
+        const sellerDisplay = sale.sellerName
+          ? `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
+               <i class="fa-solid fa-user-tag text-slate-400 text-[11px]"></i>${escapeHtml(sale.sellerName)}
+             </span>`
+          : `<span class="text-xs text-slate-400 italic">No asignado</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50/90 transition">
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <div class="font-bold text-slate-900">${escapeHtml(sale.invoice)}</div>
+              <div class="text-xs text-slate-400">${formatDateShort(sale.saleDate)}</div>
+            </td>
+            <td class="py-3.5 px-4">
+              <div class="font-semibold text-slate-800">${escapeHtml(sale.clientName)}</div>
+              <div class="text-xs text-slate-400">${escapeHtml(sale.clientDoc || 'Sin documento')}</div>
+            </td>
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              ${sellerDisplay}
+            </td>
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="font-bold text-slate-900">${formatUSD(sale.totalAmount)}</div>
+              ${bcvRate > 0 ? `<div class="text-[11px] text-slate-400">${formatBs(sale.totalAmount)}</div>` : ''}
+            </td>
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="font-semibold text-emerald-600">${formatUSD(sale.downPayment)}</div>
+              <div class="text-[11px] text-slate-400">${downPct}% inicial</div>
+            </td>
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="font-semibold text-indigo-600">${formatUSD(sale.financedAmount)}</div>
+              <div class="text-[11px] text-slate-400">${totalInst} cuotas</div>
+            </td>
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-semibold text-slate-700">${paidInst}/${totalInst} pagadas</span>
+                <span class="text-slate-400">${pct}%</span>
+              </div>
+              <div class="w-28 bg-slate-200 rounded-full h-1.5 overflow-hidden mx-auto">
+                <div class="bg-emerald-500 h-1.5 rounded-full transition-all" style="width: ${pct}%"></div>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              ${nextDueHtml}
+            </td>
+            <td class="py-3.5 px-4 text-center whitespace-nowrap">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${st.badgeClass}">
+                ${st.label}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <button
+                onclick="openDetailModal('${sale.id}')"
+                type="button"
+                class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <i class="fa-solid fa-list-check"></i> Cuotas
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function openNewSaleModal() {
+      const form = document.getElementById('newSaleForm');
+      if (form) form.reset();
+      const dateInput = document.getElementById('saleDate');
+      if (dateInput) dateInput.value = getTodayISO();
+      const pctSelect = document.getElementById('saleDownPct');
+      if (pctSelect) pctSelect.value = '40';
+      updateSalePreview();
+      const modal = document.getElementById('newSaleModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeNewSaleModal() {
+      const modal = document.getElementById('newSaleModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function onTotalOrPctChange() {
+      const total = parseFloat(document.getElementById('saleTotal').value) || 0;
+      const pctSelect = document.getElementById('saleDownPct').value;
+      const downInput = document.getElementById('saleDownAmount');
+
+      if (pctSelect !== 'custom') {
+        const pct = parseFloat(pctSelect);
+        const calcDown = Math.round((total * (pct / 100)) * 100) / 100;
+        downInput.value = total > 0 ? calcDown.toFixed(2) : '';
+      }
+      updateSalePreview();
+    }
+
+    function onManualDownChange() {
+      document.getElementById('saleDownPct').value = 'custom';
+      updateSalePreview();
+    }
+
+    function updateSalePreview() {
+      const saleDate = document.getElementById('saleDate').value || getTodayISO();
+      const total = parseFloat(document.getElementById('saleTotal').value) || 0;
+      const down = parseFloat(document.getElementById('saleDownAmount').value) || 0;
+      const count = parseInt(document.getElementById('saleInstallmentsCount').value) || 3;
+
+      const financed = Math.max(0, Math.round((total - down) * 100) / 100);
+      document.getElementById('previewFinancedBadge').textContent = `Financiado: ${formatUSD(financed)}`;
+
+      const container = document.getElementById('previewInstallmentsList');
+      if (financed <= 0) {
+        container.innerHTML = `<div class="col-span-3 text-slate-400 italic">Ingresa un monto total superior a la inicial para proyectar las cuotas.</div>`;
+        return;
+      }
+
+      const previewList = buildInstallments(saleDate, financed, count);
+      container.innerHTML = previewList.map(item => `
+        <div class="bg-white border border-slate-200 rounded-lg px-2.5 py-2 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-slate-700">Cuota ${item.number}</span>
+            <span class="block text-[11px] text-slate-400">${formatDateShort(item.dueDate)}</span>
+          </div>
+          <span class="font-extrabold text-indigo-600">${formatUSD(item.amount)}</span>
+        </div>
+      `).join('');
+    }
+
+    function handleCreateSale(e) {
+      e.preventDefault();
+      const saleDate = document.getElementById('saleDate').value;
+      const invoice = document.getElementById('saleInvoice').value.trim();
+      const sellerName = document.getElementById('saleSeller').value.trim();
+      const clientName = document.getElementById('saleClient').value.trim();
+      const clientDoc = document.getElementById('saleClientDoc').value.trim();
+      const totalAmount = Math.round((parseFloat(document.getElementById('saleTotal').value) || 0) * 100) / 100;
+      const downPayment = Math.round((parseFloat(document.getElementById('saleDownAmount').value) || 0) * 100) / 100;
+      const count = parseInt(document.getElementById('saleInstallmentsCount').value) || 3;
+      const downMethod = document.getElementById('saleDownMethod').value;
+      const notes = document.getElementById('saleNotes').value.trim();
+
+      if (downPayment > totalAmount) {
+        alert('El monto de la inicial no puede ser mayor al monto total de la venta.');
+        return;
+      }
+
+      const financedAmount = Math.round((totalAmount - downPayment) * 100) / 100;
+      const installments = buildInstallments(saleDate, financedAmount, count);
+
+      const newSale = {
+        id: 'sale_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        saleDate,
+        invoice,
+        sellerName,
+        clientName,
+        clientDoc,
+        totalAmount,
+        downPayment,
+        downMethod,
+        financedAmount,
+        notes,
+        installments
+      };
+
+      sales.unshift(newSale);
+      saveSales();
+      closeNewSaleModal();
+    }
+
+    function openDetailModal(saleId) {
+      const sale = sales.find(s => s.id === saleId);
+      if (!sale) return;
+
+      document.getElementById('detailInvoice').textContent = sale.invoice;
+      document.getElementById('detailClientName').textContent = sale.clientName;
+      document.getElementById('detailSellerBadge').innerHTML = `<i class="fa-solid fa-user-tie text-yellow-400 mr-1"></i>Vendedor: ${escapeHtml(sale.sellerName || 'No asignado')}`;
+      document.getElementById('detailSubInfo').textContent = `Fecha venta: ${formatDateShort(sale.saleDate)} • ${sale.clientDoc || 'Sin documento'}`;
+
+      const paidInstTotal = sale.installments.filter(i => i.paid).reduce((acc, i) => acc + i.amount, 0);
+      const pendingBalance = Math.max(0, Math.round((sale.financedAmount - paidInstTotal) * 100) / 100);
+
+      document.getElementById('detailTotal').textContent = formatUSD(sale.totalAmount);
+      document.getElementById('detailDown').textContent = formatUSD(sale.downPayment);
+      document.getElementById('detailPaidInstallments').textContent = formatUSD(paidInstTotal);
+      document.getElementById('detailBalance').textContent = formatUSD(pendingBalance);
+
+      document.getElementById('detailNotesText').textContent = sale.notes ? `Detalle: ${sale.notes}` : 'Sin descripción de artículos';
+      document.getElementById('detailDownMethodText').textContent = `Inicial cobrada vía: ${sale.downMethod || 'No especificado'}`;
+
+      const container = document.getElementById('detailInstallmentsContainer');
+      if (sale.installments.length === 0) {
+        container.innerHTML = `<p class="text-sm text-slate-500 italic">Venta pagada 100% de inicial (sin cuotas financiadas).</p>`;
+      } else {
+        container.innerHTML = sale.installments.map((inst, idx) => {
+          const daysDiff = diffDaysFromToday(inst.dueDate);
+          let statusTag = '';
+          if (inst.paid) {
+            statusTag = `<span class="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Pagada el ${formatDateShort(inst.paidDate)}</span>`;
+          } else if (daysDiff < 0) {
+            statusTag = `<span class="text-xs font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">Vencida hace ${Math.abs(daysDiff)} días</span>`;
+          } else if (daysDiff === 0) {
+            statusTag = `<span class="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Vence Hoy</span>`;
+          } else {
+            statusTag = `<span class="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">Vence en ${daysDiff} días</span>`;
+          }
+
+          const actionBtn = inst.paid
+            ? `<button onclick="unpayInstallment('${sale.id}', ${idx})" type="button" class="text-xs font-semibold text-slate-500 hover:text-rose-600 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 transition cursor-pointer" title="Revertir pago">
+                 <i class="fa-solid fa-rotate-left mr-1"></i>Anular
+               </button>`
+            : `<button onclick="openPayInstallmentModal('${sale.id}', ${idx})" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-xs transition cursor-pointer">
+                 <i class="fa-solid fa-check mr-1"></i>Registrar Pago
+               </button>`;
+
+          return `
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border ${inst.paid ? 'bg-emerald-50/40 border-emerald-200' : 'bg-white border-slate-200'}">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-bold text-sm text-slate-900">Cuota #${inst.number}</span>
+                  <span class="text-xs text-slate-500">• Vence: <strong>${formatDateShort(inst.dueDate)}</strong></span>
+                  ${statusTag}
+                </div>
+                ${inst.paid
+                  ? `<div class="text-xs text-slate-500">Método: <strong>${escapeHtml(inst.paidMethod)}</strong> ${inst.reference ? `• Ref: <strong>${escapeHtml(inst.reference)}</strong>` : ''}</div>`
+                  : `<div class="text-xs text-slate-400">Pendiente por liquidación Cashea</div>`
+                }
+              </div>
+              <div class="flex items-center justify-between sm:justify-end gap-3">
+                <div class="text-right">
+                  <div class="font-extrabold text-base text-slate-900">${formatUSD(inst.amount)}</div>
+                  ${bcvRate > 0 ? `<div class="text-[11px] text-slate-400">${formatBs(inst.amount)}</div>` : ''}
+                </div>
+                ${actionBtn}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('deleteSaleBtn').onclick = () => deleteSale(sale.id);
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    function deleteSale(saleId) {
+      if (!confirm('¿Estás seguro de eliminar esta venta por completo? Esta acción no se puede deshacer.')) return;
+      sales = sales.filter(s => s.id !== saleId);
+      saveSales();
+      closeDetailModal();
+    }
+
+    function openPayInstallmentModal(saleId, instIndex) {
+      const sale = sales.find(s => s.id === saleId);
+      if (!sale) return;
+      const inst = sale.installments[instIndex];
+
+      document.getElementById('paySaleId').value = saleId;
+      document.getElementById('payInstIndex').value = instIndex;
+      document.getElementById('payInstNumber').textContent = inst.number;
+      document.getElementById('payInstAmountDisplay').textContent = formatUSD(inst.amount);
+      document.getElementById('payInstDate').value = getTodayISO();
+      document.getElementById('payInstRef').value = '';
+
+      document.getElementById('payInstallmentModal').classList.remove('hidden');
+    }
+
+    function closePayInstallmentModal() {
+      document.getElementById('payInstallmentModal').classList.add('hidden');
+    }
+
+    function confirmPayInstallment(e) {
+      e.preventDefault();
+      const saleId = document.getElementById('paySaleId').value;
+      const instIndex = parseInt(document.getElementById('payInstIndex').value);
+      const paidDate = document.getElementById('payInstDate').value;
+      const paidMethod = document.getElementById('payInstMethod').value;
+      const reference = document.getElementById('payInstRef').value.trim();
+
+      const sale = sales.find(s => s.id === saleId);
+      if (!sale || !sale.installments[instIndex]) return;
+
+      sale.installments[instIndex].paid = true;
+      sale.installments[instIndex].paidDate = paidDate;
+      sale.installments[instIndex].paidMethod = paidMethod;
+      sale.installments[instIndex].reference = reference;
+
+      saveSales();
+      closePayInstallmentModal();
+      openDetailModal(saleId);
+    }
+
+    function unpayInstallment(saleId, instIndex) {
+      if (!confirm('¿Deseas marcar esta cuota nuevamente como PENDIENTE?')) return;
+      const sale = sales.find(s => s.id === saleId);
+      if (!sale || !sale.installments[instIndex]) return;
+
+      sale.installments[instIndex].paid = false;
+      sale.installments[instIndex].paidDate = null;
+      sale.installments[instIndex].paidMethod = '';
+      sale.installments[instIndex].reference = '';
+
+      saveSales();
+      openDetailModal(saleId);
+    }
+
+    function exportToCSV() {
+      if (sales.length === 0) {
+        alert('No hay ventas registradas para exportar.');
+        return;
+      }
+
+      const headers = [
+        'Fecha Venta',
+        'Factura / Orden',
+        'Vendedor',
+        'Cliente',
+        'Cedula / Tel',
+        'Descripcion',
+        'Total Venta ($)',
+        'Inicial ($)',
+        'Metodo Inicial',
+        'Financiado ($)',
+        'Cuotas Pagadas',
+        'Total Cuotas',
+        'Saldo Pendiente ($)',
+        'Estado'
+      ];
+
+      const rows = sales.map(s => {
+        const st = getSaleStatus(s);
+        const paidCount = s.installments.filter(i => i.paid).length;
+        const paidAmt = s.installments.filter(i => i.paid).reduce((a, b) => a + b.amount, 0);
+        const pendingAmt = Math.max(0, s.financedAmount - paidAmt).toFixed(2);
+
+        return [
+          s.saleDate,
+          `"${s.invoice.replace(/"/g, '""')}"`,
+          `"${(s.sellerName || '').replace(/"/g, '""')}"`,
+          `"${s.clientName.replace(/"/g, '""')}"`,
+          `"${(s.clientDoc || '').replace(/"/g, '""')}"`,
+          `"${(s.notes || '').replace(/"/g, '""')}"`,
+          s.totalAmount.toFixed(2),
+          s.downPayment.toFixed(2),
+          `"${s.downMethod || ''}"`,
+          s.financedAmount.toFixed(2),
+          paidCount,
+          s.installments.length,
+          pendingAmt,
+          `"${st.label}"`
+        ].join(',');
+      });
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Reporte_Ventas_Cashea_${getTodayISO()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportBackupJSON() {
+      const dataStr = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), sales }, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Respaldo_CasheaControl_${getTodayISO()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importBackupJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          const importedSales = Array.isArray(parsed) ? parsed : parsed.sales;
+          if (!Array.isArray(importedSales)) throw new Error('Formato inválido');
+
+          if (confirm(`Se encontraron ${importedSales.length} ventas en el respaldo. ¿Deseas reemplazar tus datos actuales?`)) {
+            sales = importedSales;
+            saveSales();
+            alert('Respaldo restaurado exitosamente.');
+          }
+        } catch (err) {
+          alert('El archivo seleccionado no es un respaldo válido de CasheaControl.');
+        }
+        event.target.value = '';
+      };
+      reader.readAsText(file);
+    }
+
+    function loadDemoData() {
+      if (sales.length > 0 && !confirm('Esto agregará 4 ventas de ejemplo a tu lista actual. ¿Continuar?')) {
+        return;
+      }
+
+      const today = getTodayISO();
+      const d1 = addDaysISO(today, -32);
+      const d2 = addDaysISO(today, -12);
+      const d3 = addDaysISO(today, -28);
+      const d4 = today;
+
+      const demo1Inst = buildInstallments(d1, 90, 3);
+      demo1Inst[0].paid = true;
+      demo1Inst[0].paidDate = addDaysISO(d1, 14);
+      demo1Inst[0].paidMethod = 'Liquidación Cashea (Banco)';
+      demo1Inst[0].reference = 'LOTE-401';
+
+      const demo2Inst = buildInstallments(d2, 48, 3);
+
+      const demo3Inst = buildInstallments(d3, 120, 3);
+      demo3Inst.forEach((inst, i) => {
+        inst.paid = true;
+        inst.paidDate = addDaysISO(d3, (i + 1) * 14);
+        inst.paidMethod = 'Liquidación Cashea (Banco)';
+        inst.reference = `LOTE-39${i}`;
+      });
+
+      const demo4Inst = buildInstallments(d4, 150, 6);
+
+      const demos = [
+        {
+          id: 'demo_1_' + Date.now(),
+          saleDate: d1,
+          invoice: 'FAC-1042',
+          sellerName: 'Luz Pineda',
+          clientName: 'Carlos Eduardo Mendoza',
+          clientDoc: 'V-19.845.210 • 0414-5551234',
+          totalAmount: 150.00,
+          downPayment: 60.00,
+          downMethod: 'Pago Móvil',
+          financedAmount: 90.00,
+          notes: 'Zapatos deportivos + Morral',
+          installments: demo1Inst
+        },
+        {
+          id: 'demo_2_' + Date.now(),
+          saleDate: d2,
+          invoice: 'FAC-1089',
+          sellerName: 'Yoger Sanchez',
+          clientName: 'Valeria Sofía Ríos',
+          clientDoc: 'V-26.310.987 • 0412-9876543',
+          totalAmount: 80.00,
+          downPayment: 32.00,
+          downMethod: 'Punto de Venta (Débito/Crédito)',
+          financedAmount: 48.00,
+          notes: 'Set de blusas casuales',
+          installments: demo2Inst
+        },
+        {
+          id: 'demo_3_' + Date.now(),
+          saleDate: d3,
+          invoice: 'FAC-1015',
+          sellerName: 'Omar',
+          clientName: 'Andrés Felipe Gómez',
+          clientDoc: 'V-15.402.111 • 0424-1122334',
+          totalAmount: 200.00,
+          downPayment: 80.00,
+          downMethod: 'Efectivo Divisas ($)',
+          financedAmount: 120.00,
+          notes: 'Combo ropa corporativa (4 piezas)',
+          installments: demo3Inst
+        },
+        {
+          id: 'demo_4_' + Date.now(),
+          saleDate: d4,
+          invoice: 'FAC-1104',
+          sellerName: 'Luz Pineda',
+          clientName: 'Mariana Alejandra Silva',
+          clientDoc: 'V-23.778.900 • 0416-4433221',
+          totalAmount: 250.00,
+          downPayment: 100.00,
+          downMethod: 'Zelle / Transferencia',
+          financedAmount: 150.00,
+          notes: 'Compra Modo Más Cuotas (6 cuotas)',
+          installments: demo4Inst
+        }
+      ];
+
+      sales = [...demos, ...sales];
+      saveSales();
+    }
+  </script>
+</body>
+</html>
